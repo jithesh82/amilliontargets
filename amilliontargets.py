@@ -1,18 +1,20 @@
+"""
+Task1: save the html file to disk
+Task2: add tqdm 
+"""
 import asyncio
-from curl_cffi.requests import get, AsyncSession 
+from curl_cffi.requests import AsyncSession 
 
-async def get1():
-    get('www.tesla.com', impersonate='chrome110')
-
-async def get2():
-    get('www.war.gov', impersonate='chrome110')
+urls =['www.tesla.com', 'www.war.gov', 'www.clio.com']
 
 
 async def main():
     async with AsyncSession() as s:
-        task1 = asyncio.create_task(s.get('www.tesla.com', impersonate='chrome110'))
-        task2 = asyncio.create_task(s.get('www.tesla.com', impersonate='chrome110'))
-        await task1
-        await task2
+        tasks = [s.get(url, impersonate='chrome110') for url in urls]
+
+        results = await asyncio.gather(*tasks)
+
+        for result in results:
+            print(result.url, result.status_code)
 
 asyncio.run(main())
