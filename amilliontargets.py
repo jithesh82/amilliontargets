@@ -1,5 +1,5 @@
 import asyncio
-from curl_cffi.requests import get
+from curl_cffi.requests import get, AsyncSession 
 
 async def get1():
     get('www.tesla.com', impersonate='chrome110')
@@ -9,9 +9,10 @@ async def get2():
 
 
 async def main():
-    task1 = asyncio.create_task(get1())
-    task2 = asyncio.create_task(get2())
-    await task1
-    await task2
+    async with AsyncSession() as s:
+        task1 = asyncio.create_task(s.get('www.tesla.com', impersonate='chrome110'))
+        task2 = asyncio.create_task(s.get('www.tesla.com', impersonate='chrome110'))
+        await task1
+        await task2
 
 asyncio.run(main())
