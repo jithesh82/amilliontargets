@@ -4,9 +4,10 @@ Task2: add tqdm
 """
 import asyncio
 from curl_cffi.requests import AsyncSession 
+import random
 
-urls =['www.tesla.com', 'www.war.gov', 'www.clio.com']
-
+urls =['www.tesla.com', 'www.war.gov', 'www.clio.com', 'www.criteo.com', 'account.t-mobile.com']
+urls = random.choices(urls, k=1)
 
 async def main():
     async with AsyncSession() as s:
@@ -16,5 +17,17 @@ async def main():
 
         for result in results:
             print(result.url, result.status_code)
+            print(result.text, file=open('test' + '.html', 'w'))
+
+        async def contentWrite(result):
+            fName = result.url.split('/')[2] + '.html'
+            with open(fName, 'w') as f:
+                f.write(result.text)
+
+        tasks = [contentWrite(result) for result in results]
+
+        results = await asyncio.gather(*tasks)
+
+        print(results)
 
 asyncio.run(main())
