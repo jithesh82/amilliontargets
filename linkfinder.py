@@ -253,9 +253,12 @@ def myLinkFinder(input, output=None, regex=None):
         '''
         Output to CLI
         '''
+        endpoint_escape_list = []
         for endpoint in endpoints:
             print(html.escape(endpoint["link"]).encode(
                 'ascii', 'ignore').decode('utf8'))
+            endpoint_escape_list.append(html.escape(endpoint["link"]).encode('ascii', 'ignore').decode('utf8'))
+        return endpoint_escape_list
 
     def html_save(html):
         '''
@@ -303,32 +306,32 @@ def myLinkFinder(input, output=None, regex=None):
 
     #if __name__ == "__main__":
     # Parse command line
-    #parser = argparse.ArgumentParser()
-    #parser.add_argument("-d", "--domain",
-    #                    help="Input a domain to recursively parse all javascript located in a page",
-    #                    action="store_true")
-    #parser.add_argument("-i", "--input",
-    #                    help="Input a: URL, file or folder. \
-    #                    For folders a wildcard can be used (e.g. '/*.js').",
-    #                    required="True", action="store")
-    #parser.add_argument("-o", "--output",
-    #                    help="Where to save the file, \
-    #                    including file name. Default: output.html",
-    #                    action="store", default="output.html")
-    #parser.add_argument("-r", "--regex",
-    #                    help="RegEx for filtering purposes \
-    #                    against found endpoint (e.g. ^/api/)",
-    #                    action="store")
-    #parser.add_argument("-b", "--burp",
-    #                    help="",
-    #                    action="store_true")
-    #parser.add_argument("-c", "--cookies",
-    #                    help="Add cookies for authenticated JS files",
-    #                    action="store", default="")
-    #default_timeout = 10
-    #parser.add_argument("-t", "--timeout",
-    #                    help="How many seconds to wait for the server to send data before giving up (default: " + str(default_timeout) + " seconds)",
-    #                    default=default_timeout, type=int, metavar="<seconds>")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--domain",
+                        help="Input a domain to recursively parse all javascript located in a page",
+                        action="store_true")
+    parser.add_argument("-i", "--input",
+                        help="Input a: URL, file or folder. \
+                        For folders a wildcard can be used (e.g. '/*.js').",
+                        required="True", action="store")
+    parser.add_argument("-o", "--output",
+                        help="Where to save the file, \
+                        including file name. Default: output.html",
+                        action="store", default="output.html")
+    parser.add_argument("-r", "--regex",
+                        help="RegEx for filtering purposes \
+                        against found endpoint (e.g. ^/api/)",
+                        action="store")
+    parser.add_argument("-b", "--burp",
+                        help="",
+                        action="store_true")
+    parser.add_argument("-c", "--cookies",
+                        help="Add cookies for authenticated JS files",
+                        action="store", default="")
+    default_timeout = 10
+    parser.add_argument("-t", "--timeout",
+                        help="How many seconds to wait for the server to send data before giving up (default: " + str(default_timeout) + " seconds)",
+                        default=default_timeout, type=int, metavar="<seconds>")
     #args = parser.parse_args(['--i', input, '--o', 'cli', '--r', '.js'])
     #trace()
 
@@ -351,23 +354,32 @@ def myLinkFinder(input, output=None, regex=None):
     if args.output == "cli":
         mode = 0
 
-    print(args.input, args.output)
+    #print(args.input, args.output)
 
     #from curl_cffi.requests.models import Response
     # temporary hack to bypass the arg.pass
     #if type(r) == type(Response()):
     #    urls = [r]
     #trace()
-    # Convert input to URLs or JS files
-    urls = parser_input(args.input)
+
+    # if clause is a a hack to pass in the full html text 
+    if input.startswith('text'):
+        urls = [input]
+    else:
+        # Convert input to URLs or JS files
+        urls = parser_input(args.input)
 
     # Convert URLs to JS
     output = ''
     for url in urls:
         if not args.burp:
             try:
-                # get content using urlib Request - works for local file or url
-                file = send_request(url)
+                # here url=input -> is the full html text
+                if url.startswith('text'):
+                    file = url[6:] 
+                else:
+                    # get content using urlib Request - works for local file or url
+                    file = send_request(url)
             except Exception as e:
                 parser_error("invalid input defined or SSL error: %s" % e)
         else:
@@ -390,6 +402,7 @@ def myLinkFinder(input, output=None, regex=None):
                     new_endpoints = parser_file(file, regex_str, mode, args.regex)
                     if args.output == 'cli':
                         cli_output(new_endpoints)
+
                     else:
                         output += '''
                         <h1>File: <a href="%s" target="_blank" rel="nofollow noopener noreferrer">%s</a></h1>
@@ -442,6 +455,7 @@ def myLinkFinder(input, output=None, regex=None):
         html_save(output)
 
 if __name__ == '__main__':
-    #from curl_cffi.requests import get
-    #r = get('example.com')
-    myLinkFinder('www.tesla.com.html', 'cli', '.js')
+    from curl_cffi.requests import get
+    r = get('www.underarmour.com')
+    #myLinkFinder('www.underarmour.com.html', 'cli', '.js')
+    myLinkFinder('text ' + r.text, 'cli', '.js')
