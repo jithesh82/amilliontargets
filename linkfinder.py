@@ -24,7 +24,7 @@ import base64
 import ssl
 import xml.etree.ElementTree
 
-def myLinkFinder(fName):
+def myLinkFinder(input, output=None, regex=None):
 
     # Fix webbrowser bug for MacOS
     os.environ["BROWSER"] = "open"
@@ -303,33 +303,46 @@ def myLinkFinder(fName):
 
     #if __name__ == "__main__":
     # Parse command line
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--domain",
-                        help="Input a domain to recursively parse all javascript located in a page",
-                        action="store_true")
-    parser.add_argument("-i", "--input",
-                        help="Input a: URL, file or folder. \
-                        For folders a wildcard can be used (e.g. '/*.js').",
-                        required="True", action="store")
-    parser.add_argument("-o", "--output",
-                        help="Where to save the file, \
-                        including file name. Default: output.html",
-                        action="store", default="output.html")
-    parser.add_argument("-r", "--regex",
-                        help="RegEx for filtering purposes \
-                        against found endpoint (e.g. ^/api/)",
-                        action="store")
-    parser.add_argument("-b", "--burp",
-                        help="",
-                        action="store_true")
-    parser.add_argument("-c", "--cookies",
-                        help="Add cookies for authenticated JS files",
-                        action="store", default="")
-    default_timeout = 10
-    parser.add_argument("-t", "--timeout",
-                        help="How many seconds to wait for the server to send data before giving up (default: " + str(default_timeout) + " seconds)",
-                        default=default_timeout, type=int, metavar="<seconds>")
-    args = parser.parse_args(['--i', fName, '--o', 'cli', '--r', '.js'])
+    #parser = argparse.ArgumentParser()
+    #parser.add_argument("-d", "--domain",
+    #                    help="Input a domain to recursively parse all javascript located in a page",
+    #                    action="store_true")
+    #parser.add_argument("-i", "--input",
+    #                    help="Input a: URL, file or folder. \
+    #                    For folders a wildcard can be used (e.g. '/*.js').",
+    #                    required="True", action="store")
+    #parser.add_argument("-o", "--output",
+    #                    help="Where to save the file, \
+    #                    including file name. Default: output.html",
+    #                    action="store", default="output.html")
+    #parser.add_argument("-r", "--regex",
+    #                    help="RegEx for filtering purposes \
+    #                    against found endpoint (e.g. ^/api/)",
+    #                    action="store")
+    #parser.add_argument("-b", "--burp",
+    #                    help="",
+    #                    action="store_true")
+    #parser.add_argument("-c", "--cookies",
+    #                    help="Add cookies for authenticated JS files",
+    #                    action="store", default="")
+    #default_timeout = 10
+    #parser.add_argument("-t", "--timeout",
+    #                    help="How many seconds to wait for the server to send data before giving up (default: " + str(default_timeout) + " seconds)",
+    #                    default=default_timeout, type=int, metavar="<seconds>")
+    #args = parser.parse_args(['--i', input, '--o', 'cli', '--r', '.js'])
+    #trace()
+
+    class MyArgs():
+        def __init__(self, input, output, regex, timeout=None, burp=None, cookies=None, domain=None):
+            self.input = input
+            self.output = output
+            self.regex = regex
+            self.timeout = timeout
+            self.burp = burp
+            self.cookies = cookies 
+            self.domain = domain
+
+    args = MyArgs(input, output, regex)
 
     if args.input[-1:] == "/":
         args.input = args.input[:-1]
@@ -340,6 +353,11 @@ def myLinkFinder(fName):
 
     print(args.input, args.output)
 
+    #from curl_cffi.requests.models import Response
+    # temporary hack to bypass the arg.pass
+    #if type(r) == type(Response()):
+    #    urls = [r]
+    #trace()
     # Convert input to URLs or JS files
     urls = parser_input(args.input)
 
@@ -348,6 +366,7 @@ def myLinkFinder(fName):
     for url in urls:
         if not args.burp:
             try:
+                # get content using urlib Request - works for local file or url
                 file = send_request(url)
             except Exception as e:
                 parser_error("invalid input defined or SSL error: %s" % e)
@@ -423,4 +442,6 @@ def myLinkFinder(fName):
         html_save(output)
 
 if __name__ == '__main__':
-    myLinkFinder('www.underarmour.com.html')
+    #from curl_cffi.requests import get
+    #r = get('example.com')
+    myLinkFinder('www.tesla.com.html', 'cli', '.js')
