@@ -17,6 +17,13 @@ with open('scan_targets.txt') as f:
 
 urls = random.choices(urls, k=1)
 
+async def getUrls(urls: list) -> list: 
+    async with AsyncSession() as s:
+        tasks = [s.get(url, impersonate='chrome110', headers={'X-Bug-Bounty  ':'BugCrowd-jitheshkuyyalil'}) for url in urls]
+        results = await asyncio.gather(*tasks)
+        return results
+
+
 async def main():
     start = time.perf_counter()
     async with AsyncSession() as s:    
@@ -24,8 +31,10 @@ async def main():
 
         results = await asyncio.gather(*tasks)
 
+        #results = await getUrls(urls)
+
         for result in results:
-            print(result.url, result.status_code)
+            print(result.fullurl, result.status_code)
             print(result.text, file=open('test' + '.html', 'w'))
 
         print(results)
@@ -55,6 +64,14 @@ async def main():
 
         tasks = [analyzeHTML(result) for result in results]
         jslist = await asyncio.gather(*tasks)
+
+        for domain in jslist:
+            for jslink in domain:
+                jsresult = s.get(jslink)
+                foundPattern = myLinkFinder('text ' + jsresult.text, 'cli', '(?i)(API|secret|admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
+                print(foundPattern)
+
+
         print('- -' * 15)
         #jslist = jslist[0]
         for domain in jslist:
