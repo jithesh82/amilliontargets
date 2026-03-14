@@ -49,13 +49,10 @@ async def main():
 
         tasks = [analyzeHTML(result) for result in results]
 
-        await asyncio.gather(*tasks) 
-                    
+        htmlResults = await asyncio.gather(*tasks) 
+        del htmlResults 
 
-        async def analyzeJS(result):
-            foundPattern = myLinkFinder('text ' + result.text, 'cli', '(?i)(API|secret|admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
-            print('*' * 15)
-            print(foundPattern)
+        async def getJS(result):
             print('*' * 15)
             jslist = myLinkFinder('text ' + result.text, 'cli', '.js')
             #print(patternFound)
@@ -73,39 +70,27 @@ async def main():
 
             return jslistupdate
 
-        #tasks = [analyzeHTML(result) for result in results]
-        ## jslist is a 2D list -> [[jslinks-domain1],...]
-        #jslist = await asyncio.gather(*tasks)
+        tasks = [getJS(result) for result in results]
+        ## jslistAll is a 2D list -> [[jslinks-domain1],...]
+        jslistAll = await asyncio.gather(*tasks)
+        type(jslistAll)
 
-        #async def analyzeJS(results, jslist):
+        async def analyzeJS(jslist):
 
-        #    #for (domain, jslinkslist) in zip(results, jslist):
-        #    for jslink in jslinkslist:
-        #        jsresult = s.get(jslink)
-        #        foundPattern = myLinkFinder('text ' + jsresult.text, 'cli', '(?i)(API|secret|admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
-        #        if foundPattern:
-        #            with open('scanresults.txt', 'w') as f:
-        #                f.write(jsresult.url, foundPattern)
-        #        print(foundPattern)
+            #for (domain, jslinkslist) in zip(results, jslist):
+            for jslink in jslist:
+                jsresult = await s.get(jslink)
+                foundPattern = myLinkFinder('text ' + jsresult.text, 'cli', '(?i)(API|secret|admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
+                if foundPattern:
+                    with open('scanresults.txt', 'a') as f:
+                        f.write(jsresult.url + '\n')
+                print(foundPattern)
 
-        #tasks = [analyzeJS(results, jslist) for (domain, jslinkslist) in zip(result,jslist)]
+        tasks = [analyzeJS(jslinkslist) for (jslinkslist) in (jslistAll)]
 
-        #output = await asyncio.gather(*tasks)
-        #del output
+        output = await asyncio.gather(*tasks)
+        del output
 
-        #print('- -' * 15)
-        ##jslist = jslist[0]
-        #for domain in jslist:
-        #    [print(item) for item in domain]
-
-        #async def contentWrite(result):
-        #    fName = result.url.split('/')[2] + '.html'
-        #    with open(fName, 'w') as f:
-        #        f.write(result.text)
-
-        #tasks = [contentWrite(result) for result in results]
-
-        #results = await asyncio.gather(*tasks)
     end = time.perf_counter()
     print('time taken: %.2f, %.2f' % ((midtime - start), (end - midtime)))
 
