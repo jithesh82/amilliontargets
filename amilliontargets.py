@@ -29,7 +29,7 @@ async def getUrls(urls: list) -> list:
 async def main():
     start = time.perf_counter()
     async with AsyncSession() as s:    
-        async with aiosqlite.connect("amilliontargets.db") as db:
+        async with aiosqlite.connect("db_amilliontargets.db") as db:
             await db.execute("CREATE TABLE IF NOT EXISTS scan_results (id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT, status_code INTEGER)")   
             tasks = [s.get(url, impersonate='chrome110', headers={'X-Bug-Bounty':'BugCrowd-jitheshkuyyalil'}) for url in urls]
 
@@ -90,7 +90,7 @@ async def main():
                     if foundPattern:
                         with open('scanresults.txt', 'a') as f:
                             f.write(jsresult.url + '\n')
-                            async with aiosqlite.connect("amilliontargets.db") as db:
+                            async with aiosqlite.connect("db_amilliontargets.db") as db:
                                 await db.execute("INSERT INTO scan_results (url, status_code) VALUES (?, ?)", (jsresult.url, jsresult.status_code))
                                 await db.commit()
                     print(foundPattern)
@@ -104,7 +104,7 @@ async def main():
     print('time taken: %.2f, %.2f' % ((midtime - start), (end - midtime)))
 
     print("scan results from database: ")
-    async with aiosqlite.connect("amilliontargets.db") as db:
+    async with aiosqlite.connect("db_amilliontargets.db") as db:
         async with db.execute("SELECT * FROM scan_results") as cursor:
             async for row in cursor:
                 print(row)
