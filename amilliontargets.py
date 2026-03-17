@@ -6,10 +6,15 @@ import pdb
 from curl_cffi.requests import AsyncSession 
 import random
 import time
-from linkfinder import myLinkFinder
+# from linkfinder import myLinkFinder
+from jslinkfinder import myLinkFinder
 import aiosqlite
 import re
+import os
 #from pdb import set_trace as trace
+
+if os.path.exists("db_amilliontargets.db"):
+    os.remove("db_amilliontargets.db")
 
 with open('scan_targets.txt') as f:
     #x = [f.write(url) for url in urls]
@@ -57,6 +62,7 @@ async def main():
                 pattern = re.compile(r'(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
                 matches = pattern.findall(result.text)
                 #print(matches)
+                matches = list(set(matches))
                 if matches:
                     #with open('results_amilliontarget.txt', 'a') as f:
                         #f.write(result.url + '\n')
@@ -66,16 +72,15 @@ async def main():
                     return matches
 
             matches = await analyzeHTML(result)    
+            print(matches)
 
             #tasks = [analyzeHTML(result) for result in results]
 
             #htmlResults = await asyncio.gather(*tasks) 
-            print(matches)
-            import pdb; pdb.set_trace() 
 
             async def getJS(result):
                 print('*' * 15)
-                jslist = myLinkFinder('text ' + result.text, 'cli', '.js')
+                jslist = myLinkFinder(result.text)
                 #print(patternFound)
                 jslistupdate = []
                 # change relative url to full url
@@ -90,30 +95,42 @@ async def main():
                         jslistupdate.append(jslink)
 
                 return jslistupdate
+            
+            jslist = await getJS(result)
+            print(jslist)
 
-            tasks = [getJS(result) for result in results]
+            # tasks = [getJS(result) for result in results]
             ## jslistAll is a 2D list -> [[jslinks-domain1],...]
-            jslistAll = await asyncio.gather(*tasks)
-            type(jslistAll)
+            # jslistAll = await asyncio.gather(*tasks)
+            # type(jslistAll)
 
             async def analyzeJS(jslist):
 
                 #for (domain, jslinkslist) in zip(results, jslist):
                 for jslink in jslist:
                     jsresult = await s.get(jslink)
-                    foundPattern = myLinkFinder('text ' + jsresult.text, 'cli', '(?i)(API|secret|admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
-                    if foundPattern:
+                    # print(jsresult.text)
+                    pattern = re.compile(r'(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup|api|secret|secretkey)')
+                    matches = pattern.findall(jsresult.text)
+                    print("js: " , matches)
+                    #foundPattern = myLinkFinder('text ' + jsresult.text, 'cli', '(?i)(API|secret|admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
+                    matches = list(set(matches))
+                    if matches:
                         with open('scanresults.txt', 'a') as f:
                             f.write(jsresult.url + '\n')
                             async with aiosqlite.connect("db_amilliontargets.db") as db:
-                                await db.execute("INSERT INTO scan_results (url, status_code) VALUES (?, ?)", (jsresult.url, jsresult.status_code))
+                                await db.execute("INSERT INTO scan_results (url, status_code, matches) VALUES (?, ?, ?)", (jsresult.url, jsresult.status_code, ', '.join(matches)))
                                 await db.commit()
-                    print(foundPattern)
+                    print(matches)
 
-            tasks = [analyzeJS(jslinkslist) for (jslinkslist) in (jslistAll)]
+            await analyzeJS(jslist)
 
-            output = await asyncio.gather(*tasks)
-            del output
+            #import pdb; pdb.set_trace() 
+
+            # tasks = [analyzeJS(jslinkslist) for (jslinkslist) in (jslistAll)]
+
+            # output = await asyncio.gather(*tasks)
+            # del output
 
     end = time.perf_counter()
     print('time taken: %.2f, %.2f' % ((midtime - start), (end - midtime)))
