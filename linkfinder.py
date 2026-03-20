@@ -428,7 +428,8 @@ def myLinkFinder(input, output=None, regex=None):
                     continue
 
         if args.output == 'cli':
-            cli_output(endpoints)
+            clioutputlist = cli_output(endpoints)
+            return clioutputlist
         else:
             output += '''
                 <h1>File: <a href="%s" target="_blank" rel="nofollow noopener noreferrer">%s</a></h1>
@@ -456,6 +457,6 @@ def myLinkFinder(input, output=None, regex=None):
 
 if __name__ == '__main__':
     from curl_cffi.requests import get
-    r = get('www.underarmour.com')
+    r = get('http://localhost:3000/', impersonate='chrome110', headers={'X-Bug-Bounty':'BugCrowd-jitheshkuyyalil'})
     #myLinkFinder('www.underarmour.com.html', 'cli', '.js')
     myLinkFinder('text ' + r.text, 'cli', '.js')
