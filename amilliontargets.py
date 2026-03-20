@@ -27,11 +27,11 @@ url = "http://localhost:3000/"
 #urls = random.choices(urls, k=2)
 #urls = ["jitheshkuyyalil.com"]
 
-async def getUrls(urls: list) -> list: 
-    async with AsyncSession() as s:
-        tasks = [s.get(url, impersonate='chrome110', headers={'X-Bug-Bounty  ':'BugCrowd-jitheshkuyyalil'}) for url in urls]
-        results = await asyncio.gather(*tasks)
-        return results
+# async def getUrls(urls: list) -> list: 
+#     async with AsyncSession() as s:
+#         tasks = [s.get(url, impersonate='chrome110', headers={'X-Bug-Bounty  ':'BugCrowd-jitheshkuyyalil'}) for url in urls]
+#         results = await asyncio.gather(*tasks)
+#         return results
 
 async def main():
     start = time.perf_counter()
