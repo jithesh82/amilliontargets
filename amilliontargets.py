@@ -70,21 +70,21 @@ async def analyzeHTML(s: AsyncSession, result: ReconResult, db: aiosqlite.Connec
 
 async def getJS(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> list[str]:
     print('*' * 15)
-    jslist = myLinkFinder(result.text)
+    jslist_ = myLinkFinder(result.text)
     #print(patternFound)
-    jslistupdate = []
+    jslist = []
     # change relative url to full url
-    for jslink in jslist:
+    for jslink in jslist_:
         if not jslink.startswith('http'):
             from urllib.parse import urljoin
             base_url = result.url  
             relative_url = jslink
             fullurl = urljoin(base_url, relative_url)
-            jslistupdate.append(fullurl)
+            jslist.append(fullurl)
         else:
-            jslistupdate.append(jslink)
+            jslist.append(jslink)
 
-    return jslistupdate
+    return jslist
 
 async def analyzeJS(s: AsyncSession, jslist: list[str], db: aiosqlite.Connection) -> None:
     #for (domain, jslinkslist) in zip(results, jslist):
