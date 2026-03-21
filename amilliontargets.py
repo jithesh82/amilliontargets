@@ -35,10 +35,11 @@ class ReconResult:
     url: str
     text: Optional[str] = None
     status_code: Optional[int] = None
+    jslit: list[str] = field(default_factory=list)
     
 rcnResult =  ReconResult(url=url)
 
-async def getUrl(s: AsyncSession, result: ReconResult) -> ReconResult: 
+async def getUrl(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> ReconResult: 
     # async with session:
     print("fetching: ", result.url)
     output = await s.get(result.url, impersonate='chrome110', headers={'X-Bug-Bounty  ':'BugCrowd-jitheshkuyyalil'})
@@ -48,10 +49,61 @@ async def getUrl(s: AsyncSession, result: ReconResult) -> ReconResult:
     # print("fetched: ", result.url, result.status_code, result.text[:100])
     return result
 
-async def getHTML(s: AsyncSession, result: ReconResult) -> ReconResult:
-    output = await getUrl(s, result)
+async def getHTML(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> ReconResult:
+    output = await getUrl(s, result, db)
     print("fetched: ", output.url, output.status_code, output.text[:100])
     return output
+
+async def analyzeHTML(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> list[str]:
+    #foundPattern = myLinkFinder('text ' + result.text, 'cli', '(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
+    pattern = re.compile(r'(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
+    matches = pattern.findall(result.text)
+    #print(matches)
+    matches = list(set(matches))
+    if matches:
+        #with open('results_amilliontarget.txt', 'a') as f:
+            #f.write(result.url + '\n')
+        print(matches)
+        await db.execute("INSERT INTO scan_results (url, status_code, matches) VALUES (?, ?, ?)", (result.url, result.status_code, ', '.join(matches)))
+        await db.commit()
+        return matches
+
+async def getJS(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> list[str]:
+    print('*' * 15)
+    jslist = myLinkFinder(result.text)
+    #print(patternFound)
+    jslistupdate = []
+    # change relative url to full url
+    for jslink in jslist:
+        if not jslink.startswith('http'):
+            from urllib.parse import urljoin
+            base_url = result.url  
+            relative_url = jslink
+            fullurl = urljoin(base_url, relative_url)
+            jslistupdate.append(fullurl)
+        else:
+            jslistupdate.append(jslink)
+
+    return jslistupdate
+
+async def analyzeJS(s: AsyncSession, jslist: list[str], db: aiosqlite.Connection) -> None:
+    #for (domain, jslinkslist) in zip(results, jslist):
+    for jslink in jslist:
+        jsresult = await s.get(jslink)
+        # print(jsresult.text)
+        pattern = re.compile(r'(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup|api|secret|secretkey)')
+        matches = pattern.findall(jsresult.text)
+        print("js: " , matches)
+        #foundPattern = myLinkFinder('text ' + jsresult.text, 'cli', '(?i)(API|secret|admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
+        matches = list(set(matches))
+        if matches:
+            with open('scanresults.txt', 'a') as f:
+                f.write(jsresult.url + '\n')
+                async with aiosqlite.connect("db_amilliontargets.db") as db:
+                    await db.execute("INSERT INTO scan_results (url, status_code, matches) VALUES (?, ?, ?)", (jsresult.url, jsresult.status_code, ', '.join(matches)))
+                    await db.commit()
+        print(matches)
+
 
 async def main():
     start = time.perf_counter()
@@ -61,7 +113,7 @@ async def main():
             #tasks = [s.get(url, impersonate='chrome110', headers={'X-Bug-Bounty':'BugCrowd-jitheshkuyyalil'}) for url in urls]
             
             global rcnResult
-            rcnResult = await getHTML(s, rcnResult)
+            rcnResult = await getHTML(s, rcnResult, db)
 
             #result = await s.get(url, impersonate='chrome110', headers={'X-Bug-Bounty':'BugCrowd-jitheshkuyyalil'})
 
@@ -80,21 +132,21 @@ async def main():
 
             midtime = time.perf_counter()
 
-            async def analyzeHTML(result):
-                #foundPattern = myLinkFinder('text ' + result.text, 'cli', '(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
-                pattern = re.compile(r'(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
-                matches = pattern.findall(result.text)
-                #print(matches)
-                matches = list(set(matches))
-                if matches:
-                    #with open('results_amilliontarget.txt', 'a') as f:
-                        #f.write(result.url + '\n')
-                    print(matches)
-                    await db.execute("INSERT INTO scan_results (url, status_code, matches) VALUES (?, ?, ?)", (result.url, result.status_code, ', '.join(matches)))
-                    await db.commit()
-                    return matches
+            # async def analyzeHTML(result):
+            #     #foundPattern = myLinkFinder('text ' + result.text, 'cli', '(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
+            #     pattern = re.compile(r'(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
+            #     matches = pattern.findall(result.text)
+            #     #print(matches)
+            #     matches = list(set(matches))
+            #     if matches:
+            #         #with open('results_amilliontarget.txt', 'a') as f:
+            #             #f.write(result.url + '\n')
+            #         print(matches)
+            #         await db.execute("INSERT INTO scan_results (url, status_code, matches) VALUES (?, ?, ?)", (result.url, result.status_code, ', '.join(matches)))
+            #         await db.commit()
+            #         return matches
 
-            matches = await analyzeHTML(rcnResult)    
+            matches = await analyzeHTML(s, rcnResult, db)    
             print(matches)
             # import pdb; pdb.set_trace()
 
@@ -102,25 +154,25 @@ async def main():
 
             #htmlResults = await asyncio.gather(*tasks) 
 
-            async def getJS(result):
-                print('*' * 15)
-                jslist = myLinkFinder(result.text)
-                #print(patternFound)
-                jslistupdate = []
-                # change relative url to full url
-                for jslink in jslist:
-                    if not jslink.startswith('http'):
-                        from urllib.parse import urljoin
-                        base_url = result.url  
-                        relative_url = jslink
-                        fullurl = urljoin(base_url, relative_url)
-                        jslistupdate.append(fullurl)
-                    else:
-                        jslistupdate.append(jslink)
+            # async def getJS(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> list[str]:
+            #     print('*' * 15)
+            #     jslist = myLinkFinder(result.text)
+            #     #print(patternFound)
+            #     jslistupdate = []
+            #     # change relative url to full url
+            #     for jslink in jslist:
+            #         if not jslink.startswith('http'):
+            #             from urllib.parse import urljoin
+            #             base_url = result.url  
+            #             relative_url = jslink
+            #             fullurl = urljoin(base_url, relative_url)
+            #             jslistupdate.append(fullurl)
+            #         else:
+            #             jslistupdate.append(jslink)
 
-                return jslistupdate
+            #     return jslistupdate
             
-            jslist = await getJS(rcnResult)
+            jslist = await getJS(s, rcnResult, db)
             print(jslist)
             # import pdb; pdb.set_trace()
 
@@ -129,28 +181,27 @@ async def main():
             # jslistAll = await asyncio.gather(*tasks)
             # type(jslistAll)
 
-            async def analyzeJS(jslist):
+            # async def analyzeJS(s: AsyncSession, jslist: list[str], db: aiosqlite.Connection) -> None:
+            #     #for (domain, jslinkslist) in zip(results, jslist):
+            #     for jslink in jslist:
+            #         jsresult = await s.get(jslink)
+            #         # print(jsresult.text)
+            #         pattern = re.compile(r'(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup|api|secret|secretkey)')
+            #         matches = pattern.findall(jsresult.text)
+            #         print("js: " , matches)
+            #         #foundPattern = myLinkFinder('text ' + jsresult.text, 'cli', '(?i)(API|secret|admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
+            #         matches = list(set(matches))
+            #         if matches:
+            #             with open('scanresults.txt', 'a') as f:
+            #                 f.write(jsresult.url + '\n')
+            #                 async with aiosqlite.connect("db_amilliontargets.db") as db:
+            #                     await db.execute("INSERT INTO scan_results (url, status_code, matches) VALUES (?, ?, ?)", (jsresult.url, jsresult.status_code, ', '.join(matches)))
+            #                     await db.commit()
+            #         print(matches)
 
-                #for (domain, jslinkslist) in zip(results, jslist):
-                for jslink in jslist:
-                    jsresult = await s.get(jslink)
-                    # print(jsresult.text)
-                    pattern = re.compile(r'(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup|api|secret|secretkey)')
-                    matches = pattern.findall(jsresult.text)
-                    print("js: " , matches)
-                    #foundPattern = myLinkFinder('text ' + jsresult.text, 'cli', '(?i)(API|secret|admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
-                    matches = list(set(matches))
-                    if matches:
-                        with open('scanresults.txt', 'a') as f:
-                            f.write(jsresult.url + '\n')
-                            async with aiosqlite.connect("db_amilliontargets.db") as db:
-                                await db.execute("INSERT INTO scan_results (url, status_code, matches) VALUES (?, ?, ?)", (jsresult.url, jsresult.status_code, ', '.join(matches)))
-                                await db.commit()
-                    print(matches)
+            await analyzeJS(s, jslist, db)
 
-            await analyzeJS(jslist)
-
-            #import pdb; pdb.set_trace() 
+            # import pdb; pdb.set_trace() 
 
             # tasks = [analyzeJS(jslinkslist) for (jslinkslist) in (jslistAll)]
 
