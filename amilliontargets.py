@@ -27,11 +27,31 @@ url = "http://localhost:3000/"
 #urls = random.choices(urls, k=2)
 #urls = ["jitheshkuyyalil.com"]
 
-# async def getUrls(urls: list) -> list: 
-#     async with AsyncSession() as s:
-#         tasks = [s.get(url, impersonate='chrome110', headers={'X-Bug-Bounty  ':'BugCrowd-jitheshkuyyalil'}) for url in urls]
-#         results = await asyncio.gather(*tasks)
-#         return results
+from dataclasses import dataclass, field
+from typing import Optional
+
+@dataclass
+class ReconResult:
+    url: str
+    text: Optional[str] = None
+    status_code: Optional[int] = None
+    
+rcnResult =  ReconResult(url=url)
+
+async def getUrl(s: AsyncSession, result: ReconResult) -> ReconResult: 
+    # async with session:
+    print("fetching: ", result.url)
+    output = await s.get(result.url, impersonate='chrome110', headers={'X-Bug-Bounty  ':'BugCrowd-jitheshkuyyalil'})
+    # results = await asyncio.gather(*tasks)
+    result.text = output.text
+    result.status_code = output.status_code
+    # print("fetched: ", result.url, result.status_code, result.text[:100])
+    return result
+
+async def getHTML(s: AsyncSession, result: ReconResult) -> ReconResult:
+    output = await getUrl(s, result)
+    print("fetched: ", output.url, output.status_code, output.text[:100])
+    return output
 
 async def main():
     start = time.perf_counter()
@@ -39,15 +59,18 @@ async def main():
         async with aiosqlite.connect("db_amilliontargets.db") as db:
             await db.execute("CREATE TABLE IF NOT EXISTS scan_results (id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT, status_code INTEGER, matches TEXT)")   
             #tasks = [s.get(url, impersonate='chrome110', headers={'X-Bug-Bounty':'BugCrowd-jitheshkuyyalil'}) for url in urls]
+            
+            global rcnResult
+            rcnResult = await getHTML(s, rcnResult)
 
-            result = await s.get(url, impersonate='chrome110', headers={'X-Bug-Bounty':'BugCrowd-jitheshkuyyalil'})
+            #result = await s.get(url, impersonate='chrome110', headers={'X-Bug-Bounty':'BugCrowd-jitheshkuyyalil'})
 
             #results = await asyncio.gather(*tasks)
 
             #results = await getUrls(urls)
 
-            print(result.url, result.status_code, result.text[:100])
-            #import pdb; pdb.set_trace()
+            print(rcnResult.url, rcnResult.status_code, rcnResult.text[:100])
+            # import pdb; pdb.set_trace()
 
             #for result in results:
             #    print(result.url, result.status_code)
@@ -71,8 +94,9 @@ async def main():
                     await db.commit()
                     return matches
 
-            matches = await analyzeHTML(result)    
+            matches = await analyzeHTML(rcnResult)    
             print(matches)
+            # import pdb; pdb.set_trace()
 
             #tasks = [analyzeHTML(result) for result in results]
 
@@ -96,8 +120,9 @@ async def main():
 
                 return jslistupdate
             
-            jslist = await getJS(result)
+            jslist = await getJS(rcnResult)
             print(jslist)
+            # import pdb; pdb.set_trace()
 
             # tasks = [getJS(result) for result in results]
             ## jslistAll is a 2D list -> [[jslinks-domain1],...]
