@@ -35,8 +35,10 @@ class ReconResult:
     url: str
     text: Optional[str] = None
     status_code: Optional[int] = None
-    jslit: list[str] = field(default_factory=list)
-    
+    jslist: list[str] = field(default_factory=list)
+    htmlMatches: list[str] = field(default_factory=list)
+    jsMatches: list[str] = field(default_factory=list)
+
 rcnResult =  ReconResult(url=url)
 
 async def getUrl(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> ReconResult: 
@@ -51,8 +53,10 @@ async def getUrl(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection)
 
 async def getHTML(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> ReconResult:
     output = await getUrl(s, result, db)
+    result.text = output.text
+    result.status_code = output.status_code
     print("fetched: ", output.url, output.status_code, output.text[:100])
-    return output
+    return result
 
 async def analyzeHTML(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> list[str]:
     #foundPattern = myLinkFinder('text ' + result.text, 'cli', '(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
@@ -66,7 +70,10 @@ async def analyzeHTML(s: AsyncSession, result: ReconResult, db: aiosqlite.Connec
         print(matches)
         await db.execute("INSERT INTO scan_results (url, status_code, matches) VALUES (?, ?, ?)", (result.url, result.status_code, ', '.join(matches)))
         await db.commit()
-        return matches
+        # return matches
+    for match in matches:
+        result.htmlMatches.append(match)
+    return result
 
 async def getJS(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> list[str]:
     print('*' * 15)
@@ -83,12 +90,13 @@ async def getJS(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) 
             jslist.append(fullurl)
         else:
             jslist.append(jslink)
-
-    return jslist
-
-async def analyzeJS(s: AsyncSession, jslist: list[str], db: aiosqlite.Connection) -> None:
-    #for (domain, jslinkslist) in zip(results, jslist):
     for jslink in jslist:
+        result.jslist.append(jslink)
+    return result
+
+async def analyzeJS(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> None:
+    #for (domain, jslinkslist) in zip(results, jslist):
+    for jslink in result.jslist:
         jsresult = await s.get(jslink)
         # print(jsresult.text)
         pattern = re.compile(r'(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup|api|secret|secretkey)')
@@ -103,6 +111,9 @@ async def analyzeJS(s: AsyncSession, jslist: list[str], db: aiosqlite.Connection
                     await db.execute("INSERT INTO scan_results (url, status_code, matches) VALUES (?, ?, ?)", (jsresult.url, jsresult.status_code, ', '.join(matches)))
                     await db.commit()
         print(matches)
+    for match in matches:
+        result.jsMatches.append(match)
+    return result
 
 
 async def main():
@@ -146,8 +157,8 @@ async def main():
             #         await db.commit()
             #         return matches
 
-            matches = await analyzeHTML(s, rcnResult, db)    
-            print(matches)
+            rcnResult = await analyzeHTML(s, rcnResult, db)    
+            print(rcnResult.url, rcnResult.status_code, rcnResult.htmlMatches)
             # import pdb; pdb.set_trace()
 
             #tasks = [analyzeHTML(result) for result in results]
@@ -172,8 +183,8 @@ async def main():
 
             #     return jslistupdate
             
-            jslist = await getJS(s, rcnResult, db)
-            print(jslist)
+            rcnResult = await getJS(s, rcnResult, db)
+            print(rcnResult.jslist)
             # import pdb; pdb.set_trace()
 
             # tasks = [getJS(result) for result in results]
@@ -199,7 +210,7 @@ async def main():
             #                     await db.commit()
             #         print(matches)
 
-            await analyzeJS(s, jslist, db)
+            rcnResult = await analyzeJS(s, rcnResult, db)
 
             # import pdb; pdb.set_trace() 
 
