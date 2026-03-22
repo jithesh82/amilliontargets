@@ -115,6 +115,17 @@ async def analyzeJS(s: AsyncSession, result: ReconResult, db: aiosqlite.Connecti
         result.jsMatches.append(match)
     return result
 
+class reconPipeline:
+    def __init__(self, pipeline: list, result: ReconResult, s: AsyncSession, db: aiosqlite.Connection) -> ReconResult:
+        self.pipeline = pipeline
+        self.result = result
+        self.s = s
+        self.db = db
+        self.run()
+    async def run(self) -> ReconResult:
+        for func in self.pipeline:
+            self.result = await func(self.s, self.result, self.db)
+        return self.result
 
 async def main():
     start = time.perf_counter()
@@ -125,11 +136,9 @@ async def main():
             global rcnResult
             rcnResult = await getHTML(s, rcnResult, db)
 
-
             print(rcnResult.url, rcnResult.status_code, rcnResult.text[:100])
 
             midtime = time.perf_counter()
-
 
             rcnResult = await analyzeHTML(s, rcnResult, db)    
             print(rcnResult.url, rcnResult.status_code, rcnResult.htmlMatches)
@@ -138,6 +147,11 @@ async def main():
             print(rcnResult.jslist)
 
             rcnResult = await analyzeJS(s, rcnResult, db)
+
+            url = 'http://localhost:3000/'
+            mypipe = reconPipeline(pipeline=[getHTML, analyzeHTML, getJS, analyzeJS], result=ReconResult(url=url), s=s, db=db)
+            mypipeResult = await mypipe.run()
+            print(mypipeResult.url, mypipeResult.status_code, mypipeResult.htmlMatches, mypipeResult.jsMatches)
 
 
     end = time.perf_counter()
