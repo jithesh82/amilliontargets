@@ -134,19 +134,19 @@ async def main():
             await db.execute("CREATE TABLE IF NOT EXISTS scan_results (id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT, status_code INTEGER, matches TEXT)")   
             
             global rcnResult
-            rcnResult = await getHTML(s, rcnResult, db)
+            #rcnResult = await getHTML(s, rcnResult, db)
 
-            print(rcnResult.url, rcnResult.status_code, rcnResult.text[:100])
+            #print(rcnResult.url, rcnResult.status_code, rcnResult.text[:100])
 
             midtime = time.perf_counter()
 
-            rcnResult = await analyzeHTML(s, rcnResult, db)    
-            print(rcnResult.url, rcnResult.status_code, rcnResult.htmlMatches)
+            #rcnResult = await analyzeHTML(s, rcnResult, db)    
+            #print(rcnResult.url, rcnResult.status_code, rcnResult.htmlMatches)
             
-            rcnResult = await getJS(s, rcnResult, db)
-            print(rcnResult.jslist)
+            #rcnResult = await getJS(s, rcnResult, db)
+            #print(rcnResult.jslist)
 
-            rcnResult = await analyzeJS(s, rcnResult, db)
+            #rcnResult = await analyzeJS(s, rcnResult, db)
 
             url = 'http://localhost:3000/'
             mypipe = reconPipeline(pipeline=[getHTML, analyzeHTML, getJS, analyzeJS], result=ReconResult(url=url), s=s, db=db)
