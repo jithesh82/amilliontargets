@@ -41,6 +41,25 @@ class ReconResult:
 
 rcnResult =  ReconResult(url=url)
 
+class VulnRecon:
+    def __init__(self, s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> ReconResult:
+        self.s = s
+        self.result = result
+        self.db = db
+
+    def run(self) -> ReconResult:
+        pass
+        
+    async def getUrl(self) -> ReconResult: 
+        # async with session:
+        print("fetching: ", self.result.url)
+        output = await s.get(self.result.url, impersonate='chrome110', headers={'X-Bug-Bounty  ':'BugCrowd-jitheshkuyyalil'})
+        # results = await asyncio.gather(*tasks)
+        self.result.text = output.text
+        self.result.status_code = output.status_code
+        # print("fetched: ", self.result.url, self.result.status_code, self.result.text[:100])
+        return self.result
+
 async def getUrl(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> ReconResult: 
     # async with session:
     print("fetching: ", result.url)
