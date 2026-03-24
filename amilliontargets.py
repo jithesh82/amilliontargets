@@ -41,79 +41,6 @@ class ReconResult:
 
 rcnResult =  ReconResult(url=url)
 
-async def getUrl(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> ReconResult: 
-    # async with session:
-    print("fetching: ", result.url)
-    output = await s.get(result.url, impersonate='chrome110', headers={'X-Bug-Bounty  ':'BugCrowd-jitheshkuyyalil'})
-    # results = await asyncio.gather(*tasks)
-    result.text = output.text
-    result.status_code = output.status_code
-    # print("fetched: ", result.url, result.status_code, result.text[:100])
-    return result
-
-async def getHTML(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> ReconResult:
-    output = await getUrl(s, result, db)
-    result.text = output.text
-    result.status_code = output.status_code
-    print("fetched: ", output.url, output.status_code, output.text[:100])
-    return result
-
-async def analyzeHTML(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> list[str]:
-    #foundPattern = myLinkFinder('text ' + result.text, 'cli', '(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
-    pattern = re.compile(r'(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
-    matches = pattern.findall(result.text)
-    #print(matches)
-    matches = list(set(matches))
-    if matches:
-        #with open('results_amilliontarget.txt', 'a') as f:
-            #f.write(result.url + '\n')
-        print(matches)
-        await db.execute("INSERT INTO scan_results (url, status_code, matches) VALUES (?, ?, ?)", (result.url, result.status_code, ', '.join(matches)))
-        await db.commit()
-        # return matches
-    for match in matches:
-        result.htmlMatches.append(match)
-    return result
-
-async def getJS(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> list[str]:
-    print('*' * 15)
-    jslist_ = myLinkFinder(result.text)
-    #print(patternFound)
-    jslist = []
-    # change relative url to full url
-    for jslink in jslist_:
-        if not jslink.startswith('http'):
-            from urllib.parse import urljoin
-            base_url = result.url  
-            relative_url = jslink
-            fullurl = urljoin(base_url, relative_url)
-            jslist.append(fullurl)
-        else:
-            jslist.append(jslink)
-    for jslink in jslist:
-        result.jslist.append(jslink)
-    return result
-
-async def analyzeJS(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> None:
-    #for (domain, jslinkslist) in zip(results, jslist):
-    for jslink in result.jslist:
-        jsresult = await s.get(jslink)
-        # print(jsresult.text)
-        pattern = re.compile(r'(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup|api|secret|secretkey)')
-        matches = pattern.findall(jsresult.text)
-        print("js: " , matches)
-        #foundPattern = myLinkFinder('text ' + jsresult.text, 'cli', '(?i)(API|secret|admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
-        matches = list(set(matches))
-        if matches:
-            with open('scanresults.txt', 'a') as f:
-                f.write(jsresult.url + '\n')
-                async with aiosqlite.connect("db_amilliontargets.db") as db:
-                    await db.execute("INSERT INTO scan_results (url, status_code, matches) VALUES (?, ?, ?)", (jsresult.url, jsresult.status_code, ', '.join(matches)))
-                    await db.commit()
-        print(matches)
-    for match in matches:
-        result.jsMatches.append(match)
-    return result
 
 class reconPipeline:
     def __init__(self, pipeline: list, s: AsyncSession, result: ReconResult,  db: aiosqlite.Connection) -> ReconResult:
@@ -230,12 +157,6 @@ async def main():
             global rcnResult
 
             midtime = time.perf_counter()
-
-            ## pipeline test with functions as input
-            #url = 'http://localhost:3000/'
-            #mypipe = reconPipeline(pipeline=[getHTML, analyzeHTML, getJS], result=ReconResult(url=url), s=s, db=db)
-            #mypipeResult = await mypipe.run()
-            #print(mypipeResult.url, mypipeResult.status_code, mypipeResult.htmlMatches, mypipeResult.jsMatches)
 
             # pipeline test with class as input
             print("\n" + "*" * 15 + "class pipeline test" + "*" * 15)
