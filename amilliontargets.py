@@ -41,25 +41,6 @@ class ReconResult:
 
 rcnResult =  ReconResult(url=url)
 
-class VulnRecon:
-    def __init__(self, s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> ReconResult:
-        self.s = s
-        self.result = result
-        self.db = db
-
-    def run(self) -> ReconResult:
-        pass
-        
-    async def getUrl(self) -> ReconResult: 
-        # async with session:
-        print("fetching: ", self.result.url)
-        output = await s.get(self.result.url, impersonate='chrome110', headers={'X-Bug-Bounty  ':'BugCrowd-jitheshkuyyalil'})
-        # results = await asyncio.gather(*tasks)
-        self.result.text = output.text
-        self.result.status_code = output.status_code
-        # print("fetched: ", self.result.url, self.result.status_code, self.result.text[:100])
-        return self.result
-
 async def getUrl(s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> ReconResult: 
     # async with session:
     print("fetching: ", result.url)
@@ -135,7 +116,7 @@ async def analyzeJS(s: AsyncSession, result: ReconResult, db: aiosqlite.Connecti
     return result
 
 class reconPipeline:
-    def __init__(self, pipeline: list, result: ReconResult, s: AsyncSession, db: aiosqlite.Connection) -> ReconResult:
+    def __init__(self, pipeline: list, s: AsyncSession, result: ReconResult,  db: aiosqlite.Connection) -> ReconResult:
         self.pipeline = pipeline
         self.result = result
         self.s = s
@@ -144,6 +125,45 @@ class reconPipeline:
     async def run(self) -> ReconResult:
         for func in self.pipeline:
             self.result = await func(self.s, self.result, self.db)
+        return self.result
+
+class VulnRecon:
+    def __init__(self, s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> ReconResult:
+        self.s = s
+        self.result = result
+        self.db = db
+    async def run(self) -> ReconResult:
+        pass       
+    async def getUrl(self) -> ReconResult: 
+        # async with session:
+        print("fetching: ", self.result.url)
+        output = await self.s.get(self.result.url, impersonate='chrome110', headers={'X-Bug-Bounty  ':'BugCrowd-jitheshkuyyalil'})
+        # results = await asyncio.gather(*tasks)
+        self.result.text = output.text
+        self.result.status_code = output.status_code
+        # print("fetched: ", self.result.url, self.result.status_code, self.result.text[:100])
+        return self.result
+
+class pullHTML(VulnRecon):
+    def __init__(self, s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> ReconResult:
+        super().__init__(s, result, db)
+    async def run(self) -> ReconResult:
+        output = await self.getUrl()
+        self.result.text = output.text
+        self.result.status_code = output.status_code
+        print("fetched: ", output.url, output.status_code, output.text[:100])
+        return self.result
+
+class reconPipelineClass:
+    def __init__(self, pipeline: list, s: AsyncSession, result: ReconResult,  db: aiosqlite.Connection) -> ReconResult:
+        self.pipeline = pipeline
+        self.result = result
+        self.s = s
+        self.db = db
+        self.run()
+    async def run(self) -> ReconResult:
+        for reconclass in self.pipeline:
+            self.result = await reconclass(self.s, self.result, self.db).run()
         return self.result
 
 async def main():
@@ -167,8 +187,16 @@ async def main():
 
             #rcnResult = await analyzeJS(s, rcnResult, db)
 
+            # pipeline test with functions as input
             url = 'http://localhost:3000/'
             mypipe = reconPipeline(pipeline=[getHTML, analyzeHTML, getJS, analyzeJS], result=ReconResult(url=url), s=s, db=db)
+            mypipeResult = await mypipe.run()
+            print(mypipeResult.url, mypipeResult.status_code, mypipeResult.htmlMatches, mypipeResult.jsMatches)
+
+            # pipeline test with class as input
+            print("\n" + "*" * 15 + "class pipeline test" + "*" * 15)
+            url = 'http://localhost:3000/'
+            mypipe = reconPipelineClass(pipeline=[pullHTML],  s=s, result=ReconResult(url=url), db=db)
             mypipeResult = await mypipe.run()
             print(mypipeResult.url, mypipeResult.status_code, mypipeResult.htmlMatches, mypipeResult.jsMatches)
 
