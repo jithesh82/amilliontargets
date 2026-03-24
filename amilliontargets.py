@@ -231,11 +231,11 @@ async def main():
 
             midtime = time.perf_counter()
 
-            # pipeline test with functions as input
-            url = 'http://localhost:3000/'
-            mypipe = reconPipeline(pipeline=[getHTML, analyzeHTML, getJS], result=ReconResult(url=url), s=s, db=db)
-            mypipeResult = await mypipe.run()
-            print(mypipeResult.url, mypipeResult.status_code, mypipeResult.htmlMatches, mypipeResult.jsMatches)
+            ## pipeline test with functions as input
+            #url = 'http://localhost:3000/'
+            #mypipe = reconPipeline(pipeline=[getHTML, analyzeHTML, getJS], result=ReconResult(url=url), s=s, db=db)
+            #mypipeResult = await mypipe.run()
+            #print(mypipeResult.url, mypipeResult.status_code, mypipeResult.htmlMatches, mypipeResult.jsMatches)
 
             # pipeline test with class as input
             print("\n" + "*" * 15 + "class pipeline test" + "*" * 15)
