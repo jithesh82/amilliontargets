@@ -144,7 +144,7 @@ class VulnRecon:
         # print("fetched: ", self.result.url, self.result.status_code, self.result.text[:100])
         return self.result
 
-class pullHTML(VulnRecon):
+class GetHTML(VulnRecon):
     def __init__(self, s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> ReconResult:
         super().__init__(s, result, db)
     async def run(self) -> ReconResult:
@@ -152,6 +152,61 @@ class pullHTML(VulnRecon):
         self.result.text = output.text
         self.result.status_code = output.status_code
         print("fetched: ", output.url, output.status_code, output.text[:100])
+        return self.result
+
+class AnalyzeHTML(VulnRecon):
+    def __init__(self, s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> ReconResult:
+        super().__init__(s, result, db)
+    async def run(self) -> ReconResult:
+        pattern = re.compile(r'(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
+        matches = pattern.findall(self.result.text)
+        matches = list(set(matches))
+        if matches:
+            print(matches)
+            await self.db.execute("INSERT INTO scan_results (url, status_code, matches) VALUES (?, ?, ?)", (self.result.url, self.result.status_code, ', '.join(matches)))
+            await self.db.commit()
+        for match in matches:
+            self.result.htmlMatches.append(match)
+        return self.result
+
+class GetJS(VulnRecon):
+    def __init__(self, s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> ReconResult:
+        super().__init__(s, result, db)
+    async def run(self) -> ReconResult:
+        print('*' * 15)
+        jslist_ = myLinkFinder(self.result.text)
+        jslist = []
+        for jslink in jslist_:
+            if not jslink.startswith('http'):
+                from urllib.parse import urljoin
+                base_url = self.result.url  
+                relative_url = jslink
+                fullurl = urljoin(base_url, relative_url)
+                jslist.append(fullurl)
+            else:
+                jslist.append(jslink)
+        for jslink in jslist:
+            self.result.jslist.append(jslink)
+        return self.result
+
+class AnalyzeJS(VulnRecon):
+    def __init__(self, s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> ReconResult:
+        super().__init__(s, result, db)
+    async def run(self) -> ReconResult:
+        for jslink in self.result.jslist:
+            jsresult = await self.s.get(jslink)
+            pattern = re.compile(r'(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup|api|secret|secretkey)')
+            matches = pattern.findall(jsresult.text)
+            matches = list(set(matches))
+            if matches:
+                with open('scanresults.txt', 'a') as f:
+                    f.write(jsresult.url + '\n')
+                    async with aiosqlite.connect("db_amilliontargets.db") as db:
+                        await db.execute("INSERT INTO scan_results (url, status_code, matches) VALUES (?, ?, ?)", (jsresult.url, jsresult.status_code, ', '.join(matches)))
+                        await db.commit()
+            print(matches)
+        for match in matches:
+            self.result.jsMatches.append(match)
         return self.result
 
 class reconPipelineClass:
@@ -173,30 +228,19 @@ async def main():
             await db.execute("CREATE TABLE IF NOT EXISTS scan_results (id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT, status_code INTEGER, matches TEXT)")   
             
             global rcnResult
-            #rcnResult = await getHTML(s, rcnResult, db)
-
-            #print(rcnResult.url, rcnResult.status_code, rcnResult.text[:100])
 
             midtime = time.perf_counter()
 
-            #rcnResult = await analyzeHTML(s, rcnResult, db)    
-            #print(rcnResult.url, rcnResult.status_code, rcnResult.htmlMatches)
-            
-            #rcnResult = await getJS(s, rcnResult, db)
-            #print(rcnResult.jslist)
-
-            #rcnResult = await analyzeJS(s, rcnResult, db)
-
             # pipeline test with functions as input
             url = 'http://localhost:3000/'
-            mypipe = reconPipeline(pipeline=[getHTML, analyzeHTML, getJS, analyzeJS], result=ReconResult(url=url), s=s, db=db)
+            mypipe = reconPipeline(pipeline=[getHTML, analyzeHTML, getJS], result=ReconResult(url=url), s=s, db=db)
             mypipeResult = await mypipe.run()
             print(mypipeResult.url, mypipeResult.status_code, mypipeResult.htmlMatches, mypipeResult.jsMatches)
 
             # pipeline test with class as input
             print("\n" + "*" * 15 + "class pipeline test" + "*" * 15)
             url = 'http://localhost:3000/'
-            mypipe = reconPipelineClass(pipeline=[pullHTML],  s=s, result=ReconResult(url=url), db=db)
+            mypipe = reconPipelineClass(pipeline=[GetHTML, AnalyzeHTML, GetJS, AnalyzeJS],  s=s, result=ReconResult(url=url), db=db)
             mypipeResult = await mypipe.run()
             print(mypipeResult.url, mypipeResult.status_code, mypipeResult.htmlMatches, mypipeResult.jsMatches)
 
