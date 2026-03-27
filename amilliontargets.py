@@ -11,6 +11,7 @@ from jslinkfinder import myLinkFinder
 import aiosqlite
 import re
 import os
+from abc import ABC, abstractmethod
 #from pdb import set_trace as trace
 
 if os.path.exists("db_amilliontargets.db"):
@@ -54,11 +55,12 @@ class reconPipeline:
             self.result = await func(self.s, self.result, self.db)
         return self.result
 
-class VulnRecon:
+class VulnRecon(ABC):
     def __init__(self, s: AsyncSession, result: ReconResult, db: aiosqlite.Connection) -> ReconResult:
         self.s = s
         self.result = result
         self.db = db
+    @abstractmethod
     async def run(self) -> ReconResult:
         pass       
     async def getUrl(self) -> ReconResult: 
