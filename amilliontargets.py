@@ -167,7 +167,6 @@ async def main():
             mypipeResult = await mypipe.run()
             print(mypipeResult.url, mypipeResult.status_code, mypipeResult.htmlMatches, mypipeResult.jsMatches)
 
-
     end = time.perf_counter()
     print('time taken: %.2f, %.2f' % ((midtime - start), (end - midtime)))
 
