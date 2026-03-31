@@ -36,7 +36,7 @@ from typing import Optional
 @dataclass
 class ReconResult:
     url: str
-    text: Optional[str] = None
+    text: Optional[str] = ''
     status_code: Optional[int] = None
     jslist: list[str] = field(default_factory=list)
     htmlMatches: list[str] = field(default_factory=list)
@@ -68,7 +68,11 @@ class VulnRecon(ABC):
     async def getUrl(self) -> ReconResult: 
         # async with session:
         print("fetching: ", self.result.url)
-        output = await self.s.get(self.result.url, impersonate='chrome110')
+        try:
+            output = await self.s.get(self.result.url, impersonate='chrome110')
+        except Exception as e:
+            print(f"Error occurred while fetching {self.result.url}: {e}")
+            return self.result
         # results = await asyncio.gather(*tasks)
         self.result.text = output.text
         self.result.status_code = output.status_code
@@ -96,8 +100,12 @@ class AnalyzeHTML(VulnRecon):
         super().__init__(s, result, db)
     async def run(self) -> ReconResult:
         #pattern = re.compile(r'(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup)')
-        pattern = re.compile(r'(?i)(flagsmith)')
-        matches = pattern.findall(self.result.text)
+        pattern = re.compile(r'(?i)(graphql|admin)')
+        try:
+            matches = pattern.findall(self.result.text)
+        except Exception as e:
+            print(f"Error occurred while finding HTML matches: {e}")
+            matches = []
         matches = list(set(matches))
         if matches:
             print(matches)
@@ -119,7 +127,7 @@ class GetJS(VulnRecon):
                 base_url = self.result.url  
                 relative_url = jslink
                 fullurl = urljoin(base_url, relative_url)
-                print('we are here: ', base_url, jslink, fullurl)
+                # print('we are here: ', base_url, jslink, fullurl)
                 jslist.append(fullurl)
             else:
                 jslist.append(jslink)
@@ -135,7 +143,8 @@ class AnalyzeJS(VulnRecon):
         matches = []
         for jslink in self.result.jslist:
             jsresult = await self.s.get(jslink)
-            pattern = re.compile(r'(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup|api|secret|secretkey)')
+            #pattern = re.compile(r'(?i)(admin|administrator|internal|old|bak|backup|key|env|.env|back|bkup|api|secret|secretkey)')
+            pattern = re.compile(r'(?i)(admin|graphql)')
             matches = pattern.findall(jsresult.text)
             matches = list(set(matches))
             if matches:
@@ -158,7 +167,12 @@ class reconPipelineClass:
         # await self.run()
     async def run(self) -> ReconResult:
         for reconclass in self.pipeline:
-            self.result = await reconclass(self.s, self.result, self.db).run()
+            try:
+                self.result = await reconclass(self.s, self.result, self.db).run()
+            except Exception as e:
+                print(f"Error occurred while running {reconclass.__name__}: {e}")
+                print("Error occurred while running pipeline, skipping to next target url: ", self.result.url)
+                break
         return self.result
 
 async def definePipe(url):
@@ -184,7 +198,7 @@ async def definePipe(url):
 def normalize(url):
     # if not url.startswith('http'):
     if not re.match(r'^https?://', url):
-        url = 'http://' + url
+        url = 'https://' + url
     return url
 
 async def main():
@@ -192,11 +206,12 @@ async def main():
     urls = [url]
     urls = open('targets.txt').read().splitlines()  # Read URLs from a file and limit to the first 2 for testing
     urls = [normalize(url) for url in urls]  # Normalize URLs to ensure they have a scheme
-    urls = random.choices(urls, k=2)  # Randomly select 2 URLs for testing
+    #urls = random.choices(urls, k=2)  # Randomly select 2 URLs for testing
     #urls = [url, url]
     #urls = ['https://devedge.t-mobile.com/']
     #urls = ['metrobyt-mobile.com', "chromewebstore.google.com"]
     #urls = [normalize('metrobyt-mobile.com')]
+    urls = [normalize('www.underarmour.com')]
     tasks = []
     for url in urls:
          tasks.append(definePipe(url))
